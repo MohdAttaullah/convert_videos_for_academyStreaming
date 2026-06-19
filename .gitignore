@@ -1,0 +1,7 @@
+# Data engineering folder (excluded from repo)
+Data Engineering/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
