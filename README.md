@@ -77,3 +77,44 @@ When `DRY_RUN = False`, the script will ONLY delete the original file if:
 - The output file has the `_720.mp4` suffix.
 - The output file is located in the exact same directory as the input file.
 - The output file path is genuinely different from the original file path.
+
+## FFmpeg Conversion Parameters
+
+The conversion command is carefully tuned for **course/academy streaming**: a good balance of visual quality, small file size, and smooth web playback. These values have been tested and validated for this use case.
+
+> ⚠️ **Do not change these values unless you fully understand the trade-offs.** They are deliberately chosen to keep quality high while keeping files small and web-friendly. Changing them can break the quality/size balance, increase storage costs, or cause stuttering during streaming.
+
+```python
+cmd = [
+    "ffmpeg",
+    "-i", str(input_path),
+    "-vf", "scale=-2:720",
+    "-c:v", "libx264",
+    "-preset", "slow",
+    "-crf", "24",
+    "-c:a", "aac",
+    "-b:a", "96k",
+    "-movflags", "+faststart",
+    str(output_path)
+]
+```
+
+| Parameter | Value | What it does | Why this value |
+| --- | --- | --- | --- |
+| `-i` | `input_path` | Specifies the **input** file to read. | Required — points ffmpeg at the source video. |
+| `-vf` | `scale=-2:720` | Scales the **video height to 720p** and auto-computes the width to preserve the aspect ratio. The `-2` tells ffmpeg to pick a width that keeps the original ratio **and** is divisible by 2 (required by H.264). | 720p is the sweet spot for course content: text/slides stay sharp on most screens while files stay far smaller than 1080p/4K. Using `-2` (not a fixed width) avoids distortion and codec errors from odd dimensions. |
+| `-c:v` | `libx264` | Sets the **video codec** to H.264 (x264 encoder). | H.264 is the most universally supported codec — it plays in every browser, phone, and player without extra plugins. Ideal for streaming reach. |
+| `-preset` | `slow` | Controls **encoder speed vs. compression efficiency**. Slower presets compress better at the same quality. | `slow` gives noticeably smaller files at the same visual quality compared to `medium`/`fast`. Since conversion is a one-time batch job, spending more CPU time once to save storage and bandwidth forever is worth it. |
+| `-crf` | `24` | **Constant Rate Factor** — the quality target. Lower = higher quality + bigger files; higher = lower quality + smaller files. Range is 0 (lossless) to 51 (worst). | `24` is tuned for screen-recorded / lecture content. It looks visually clean while keeping files small. Going below ~20 bloats size with no visible gain here; going above ~26 starts to blur text and slides. |
+| `-c:a` | `aac` | Sets the **audio codec** to AAC. | AAC is the standard, widely-supported audio format for MP4 streaming — compatible everywhere. |
+| `-b:a` | `96k` | Sets the **audio bitrate** to 96 kbps. | Course audio is mostly speech/voice, not music. 96 kbps is clear and intelligible for narration while using minimal space. Higher bitrates would waste storage with no audible benefit for talking. |
+| `-movflags` | `+faststart` | Moves the MP4 **metadata (moov atom) to the front** of the file. | Essential for streaming: it lets the video **start playing before it fully downloads**. Without it, viewers must wait for the whole file to buffer. |
+| (last arg) | `output_path` | The **output** file to write. | Required — the destination for the converted `_720.mp4` file. |
+
+### Quick summary
+- **Quality:** `crf 24` + `preset slow` → sharp text/slides at a small size.
+- **Reach:** `libx264` + `aac` → plays everywhere.
+- **Streaming:** `+faststart` → instant playback start.
+- **Size:** `720p` + `96k audio` → optimized for storage and bandwidth.
+
+**Bottom line: keep these values as-is** unless you have a specific, tested reason to change them.
